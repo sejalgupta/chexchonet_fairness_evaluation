@@ -1,0 +1,31 @@
+name: chexchonet
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - plotly
+  - anaconda
+  - defaults
+dependencies:
+  - ignite
+  - pandas
+  - pillow
+  - pydicom
+  - pytorch
+  - pyyaml
+  - scikit-image
+  - scikit-learn
+  - torchfile
+  - torchinfo
+  - torchmetrics
+  - torchvision
+  - tqdm
+  - visdom
+  - matplotlib-base
+  - matplotlib-inline
+  - pip:
+      - efficientnet-pytorch
+      - numpy
+      - opencv-python
+      - libauc
+      - jsonpatch
