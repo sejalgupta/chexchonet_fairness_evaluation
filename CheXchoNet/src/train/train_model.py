@@ -17,7 +17,7 @@ from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import os
 import sys
-from helpers import VisdomLinePlotter, update_train_stats
+from helpers import update_train_stats
 
 sys.path.insert(0, "../model/")
 from models import *
@@ -101,10 +101,6 @@ def train_model(
     n_so_far = [0.0]
 
     def train_step(engine, batch):
-        if batch is None:
-            print("Encountered an empty batch at iteration X")
-            return
-        
         model.train()
 
         if include_demo:
@@ -177,11 +173,6 @@ def train_model(
         return ret_items
 
     def eval_step(engine, batch):
-
-        if batch is None:
-            print("Encountered an empty batch at iteration X")
-            return
-        
         model.eval()
 
         with torch.no_grad():
@@ -249,6 +240,13 @@ def train_model(
     train_metrics = create_metrics(num_classes, continuous_labels)
     eval_metrics = create_metrics(num_classes, continuous_labels, is_eval=True)
 
+    def log_training_loss(engine):
+        iteration = engine.state.iteration
+        loss = engine.state.output['loss']
+        print(f"Iteration {iteration}: Loss = {loss:.4f}")
+
+    trainer.add_event_handler(Events.ITERATION_COMPLETED, log_training_loss)
+
     for metric_name, mt in train_metrics.items():
         if metric_name in ["avg_loss", "running_avg_loss"]:
             mt.attach(engine=trainer, name=metric_name)
@@ -265,8 +263,6 @@ def train_model(
         else:
             for i in range(num_classes):
                 mt[i].attach(engine=evaluator, name=metric_name + "_" + str(i))
-
-    vis = VisdomLinePlotter(env_name=visdom_run_name)
 
     @trainer.on(
         Events.ITERATION_COMPLETED(every=train_metrics_every_x_batches)
@@ -332,35 +328,6 @@ def train_model(
                 ),
             ]
 
-        for plot_id, plot_title, value_list in met_list:
-            for c in range(num_classes):
-                if continuous_labels:
-                    vis.plot(
-                        plot_id,
-                        class_to_name_continuous[c],
-                        plot_title,
-                        engine.state.iteration,
-                        value_list[c],
-                    )
-                else:
-                    vis.plot(
-                        plot_id,
-                        class_to_name[c],
-                        plot_title,
-                        engine.state.iteration,
-                        value_list[c],
-                    )
-
-        vis.plot(
-            "Batch Loss Running Avg",
-            "loss",
-            "Training Batch Loss Running Average",
-            engine.state.iteration,
-            metric_numbers["running_avg_loss"][0],
-        )
-
-        vis.viz.save([visdom_run_name])
-
     @trainer.on(
         Events.ITERATION_COMPLETED(every=eval_metrics_every_x_batches)
         | Events.EPOCH_COMPLETED
@@ -416,34 +383,6 @@ def train_model(
                 ("Eval RMSE Score", "Eval RMSE Score per class", rmse_score),
             ]
 
-        for plot_id, plot_title, value_list in met_list:
-            for c in range(num_classes):
-                if continuous_labels:
-                    vis.plot(
-                        plot_id,
-                        class_to_name_continuous[c],
-                        plot_title,
-                        engine.state.iteration,
-                        value_list[c],
-                    )
-                else:
-                    vis.plot(
-                        plot_id,
-                        class_to_name[c],
-                        plot_title,
-                        engine.state.iteration,
-                        value_list[c],
-                    )
-
-        vis.plot(
-            "Average Loss",
-            "loss",
-            "Eval Average Loss",
-            engine.state.iteration,
-            avg_loss,
-        )
-        vis.viz.save([visdom_run_name])
-
     def loss_score_function(engine):
         return -1 * engine.state.metrics["avg_loss"]
 
@@ -498,6 +437,7 @@ def train_model(
     )
 
     evaluator.add_event_handler(Events.COMPLETED, checkpoint_loss_handler)
+    
 
     auroc_to_save = {"model": model, "opt": optimizer, "trainer": trainer}
 

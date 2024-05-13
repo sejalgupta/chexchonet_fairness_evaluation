@@ -22,7 +22,7 @@ from setup_metrics import (
 from pathlib import Path
 import os
 import sys
-from helpers import VisdomLinePlotter, bootstrap_estimates
+from helpers import bootstrap_estimates
 
 sys.path.insert(0, "../model/")
 from models import (
